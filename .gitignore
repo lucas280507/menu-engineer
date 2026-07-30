@@ -1,0 +1,17 @@
+# Ignore arquivos do Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.env
+
+# NUNCA ENVIE ESTA PASTA PARA O GITHUB - CONTÉM SENHAS!
+.streamlit/secrets.toml
+
+# Ignore a landing page pois ela já está na Vercel
+landing-page/
+
+# Ignore arquivos temporários ou de teste
+exemplo_cardapio.csv
+credenciais_cardapio.txt
