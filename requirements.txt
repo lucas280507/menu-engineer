@@ -4,3 +4,4 @@ plotly
 streamlit-authenticator
 bcrypt
 pymongo
+google-generativeai

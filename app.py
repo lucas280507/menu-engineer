@@ -15,6 +15,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit_authenticator as stauth
 from pymongo import MongoClient
+import google.generativeai as genai
+import json
+import io
 
 # ──────────────────────────────────────────────
 # Configuração da página
@@ -249,39 +252,139 @@ if arquivo is None:
     st.stop()
 
 # ──────────────────────────────────────────────
-# Leitura e validação do CSV
+# Função de Correção Automática via IA (Gemini)
 # ──────────────────────────────────────────────
+def corrigir_csv_com_ia(texto_bruto_csv: str) -> pd.DataFrame | None:
+    """
+    Envia o texto bruto do CSV para o Gemini 1.5 Flash.
+    A IA interpreta as colunas e dados, limpando caracteres
+    inválidos (R$, vírgulas, texto em campos numéricos) e
+    retorna um DataFrame padronizado com as 4 colunas obrigatórias.
+    """
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        prompt = f"""Você é um assistente especializado em limpeza de dados para restaurantes.
+
+Recebemos o seguinte arquivo CSV bruto de um cliente. O arquivo pode ter:
+- Nomes de colunas diferentes do padrão (ex: "Prato" em vez de "Nome do Prato")
+- Valores com formatação errada (ex: "R$ 5,00" em vez de "5.00")
+- Texto em campos numéricos (ex: "abc" em vez de um número)
+- Colunas extras que não precisamos
+- Separadores diferentes (ponto e vírgula, tabulação, etc.)
+
+Seu trabalho é:
+1. Identificar quais colunas correspondem a: Nome do Prato, Custo Unitário, Preço de Venda e Quantidade Vendida.
+2. Limpar os valores numéricos (remover "R$", trocar vírgula por ponto, converter texto para número).
+3. Se algum valor numérico for impossível de converter (como a palavra "abc"), coloque 0.
+4. Retornar SOMENTE um JSON válido no seguinte formato (sem nenhum texto antes ou depois):
+
+[{{
+  "Nome do Prato": "nome aqui",
+  "Custo Unitário": 0.00,
+  "Preço de Venda": 0.00,
+  "Quantidade Vendida": 0
+}}]
+
+IMPORTANTE:
+- Retorne APENAS o JSON puro, sem explicações, sem markdown, sem ```json.
+- Os valores numéricos devem ser números (não strings).
+- Mantenha todos os pratos que conseguir identificar.
+
+Arquivo CSV bruto:
+---
+{texto_bruto_csv}
+---"""
+
+        response = model.generate_content(prompt)
+        texto_resposta = response.text.strip()
+
+        # Limpar possíveis marcadores de código que a IA pode adicionar
+        if texto_resposta.startswith("```"):
+            linhas = texto_resposta.split("\n")
+            texto_resposta = "\n".join(linhas[1:-1])
+
+        dados = json.loads(texto_resposta)
+        df_corrigido = pd.DataFrame(dados)
+
+        # Verificar se as 4 colunas obrigatórias estão presentes
+        colunas_necessarias = ["Nome do Prato", "Custo Unitário", "Preço de Venda", "Quantidade Vendida"]
+        for col in colunas_necessarias:
+            if col not in df_corrigido.columns:
+                return None
+
+        # Garantir tipos numéricos
+        df_corrigido["Custo Unitário"] = pd.to_numeric(df_corrigido["Custo Unitário"], errors="coerce").fillna(0)
+        df_corrigido["Preço de Venda"] = pd.to_numeric(df_corrigido["Preço de Venda"], errors="coerce").fillna(0)
+        df_corrigido["Quantidade Vendida"] = pd.to_numeric(df_corrigido["Quantidade Vendida"], errors="coerce").fillna(0).astype(int)
+
+        return df_corrigido
+
+    except Exception:
+        return None
+
+
+# ──────────────────────────────────────────────
+# Leitura e validação do CSV (com correção por IA)
+# ──────────────────────────────────────────────
+arquivo.seek(0)
+texto_bruto = arquivo.read().decode("utf-8", errors="replace")
+arquivo.seek(0)
+
+csv_precisa_correcao = False
+
 try:
-    df = pd.read_csv(arquivo)
-except Exception as e:
-    st.error(f"❌ Erro ao ler o arquivo CSV: {e}")
-    st.stop()
+    df = pd.read_csv(io.StringIO(texto_bruto))
+except Exception:
+    csv_precisa_correcao = True
+    df = None
 
 # Verificar colunas obrigatórias
-colunas_faltantes = [c for c in COLUNAS_OBRIGATORIAS if c not in df.columns]
-if colunas_faltantes:
-    st.error(
-        f"❌ O arquivo está com colunas ausentes ou nomeadas incorretamente.\n\n"
-        f"**Colunas faltantes:** {', '.join(colunas_faltantes)}\n\n"
-        f"**Colunas encontradas:** {', '.join(df.columns.tolist())}"
-    )
-    st.stop()
+if df is not None:
+    colunas_faltantes = [c for c in COLUNAS_OBRIGATORIAS if c not in df.columns]
+    if colunas_faltantes:
+        csv_precisa_correcao = True
 
 # Validar tipos numéricos
-try:
-    df["Custo Unitário"] = pd.to_numeric(df["Custo Unitário"], errors="raise")
-    df["Preço de Venda"] = pd.to_numeric(df["Preço de Venda"], errors="raise")
-    df["Quantidade Vendida"] = pd.to_numeric(df["Quantidade Vendida"], errors="raise")
-except (ValueError, TypeError):
-    st.error(
-        "❌ As colunas numéricas contêm valores inválidos. "
-        "Verifique se não há texto em 'Custo Unitário', 'Preço de Venda' "
-        "ou 'Quantidade Vendida'."
+if df is not None and not csv_precisa_correcao:
+    try:
+        df["Custo Unitário"] = pd.to_numeric(df["Custo Unitário"], errors="raise")
+        df["Preço de Venda"] = pd.to_numeric(df["Preço de Venda"], errors="raise")
+        df["Quantidade Vendida"] = pd.to_numeric(df["Quantidade Vendida"], errors="raise")
+    except (ValueError, TypeError):
+        csv_precisa_correcao = True
+
+# ── Se o CSV precisa de correção, acionar a IA ──
+if csv_precisa_correcao:
+    st.warning(
+        "⚠️ O arquivo CSV está fora do padrão esperado. "
+        "A Inteligência Artificial está analisando e corrigindo os dados automaticamente..."
     )
-    st.stop()
+    with st.spinner("🤖 Gemini AI está padronizando seu arquivo..."):
+        df = corrigir_csv_com_ia(texto_bruto)
+
+    if df is None or df.empty:
+        st.error(
+            "❌ Não foi possível corrigir o arquivo automaticamente.\n\n"
+            "Por favor, verifique se o seu CSV contém pelo menos as seguintes informações:\n\n"
+            "- Nome dos pratos\n"
+            "- Custo de cada prato\n"
+            "- Preço de venda\n"
+            "- Quantidade vendida"
+        )
+        st.stop()
+    else:
+        st.success(
+            f"✅ A IA corrigiu o arquivo com sucesso! "
+            f"**{len(df)} pratos** foram identificados e padronizados."
+        )
+        st.markdown("**Pré-visualização dos dados corrigidos:**")
+        st.dataframe(df, hide_index=True)
+        st.markdown("---")
 
 # Verificar se há dados
-if df.empty:
+if df is None or df.empty:
     st.warning("⚠️ O arquivo CSV está vazio. Adicione dados e tente novamente.")
     st.stop()
 
