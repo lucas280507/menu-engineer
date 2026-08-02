@@ -264,7 +264,7 @@ def corrigir_csv_com_ia(texto_bruto_csv: str) -> Optional[pd.DataFrame]:
     """
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
 
         prompt = f"""Você é um assistente especializado em limpeza de dados para restaurantes.
 
