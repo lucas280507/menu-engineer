@@ -18,6 +18,7 @@ from pymongo import MongoClient
 import google.generativeai as genai
 import json
 import io
+from typing import Optional
 
 # ──────────────────────────────────────────────
 # Configuração da página
@@ -254,7 +255,7 @@ if arquivo is None:
 # ──────────────────────────────────────────────
 # Função de Correção Automática via IA (Gemini)
 # ──────────────────────────────────────────────
-def corrigir_csv_com_ia(texto_bruto_csv: str) -> pd.DataFrame | None:
+def corrigir_csv_com_ia(texto_bruto_csv: str) -> Optional[pd.DataFrame]:
     """
     Envia o texto bruto do CSV para o Gemini 1.5 Flash.
     A IA interpreta as colunas e dados, limpando caracteres
@@ -321,7 +322,8 @@ Arquivo CSV bruto:
 
         return df_corrigido
 
-    except Exception:
+    except Exception as e:
+        st.error(f"⚠️ Erro interno na correção por IA: {e}")
         return None
 
 
