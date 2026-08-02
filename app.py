@@ -15,7 +15,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit_authenticator as stauth
 from pymongo import MongoClient
-import google.generativeai as genai
+import requests
 import json
 import io
 from typing import Optional
@@ -257,14 +257,13 @@ if arquivo is None:
 # ──────────────────────────────────────────────
 def corrigir_csv_com_ia(texto_bruto_csv: str) -> Optional[pd.DataFrame]:
     """
-    Envia o texto bruto do CSV para o Gemini 1.5 Flash.
-    A IA interpreta as colunas e dados, limpando caracteres
-    inválidos (R$, vírgulas, texto em campos numéricos) e
-    retorna um DataFrame padronizado com as 4 colunas obrigatórias.
+    Envia o texto bruto do CSV para a API REST do Gemini.
+    Usa chamada HTTP direta com gemini-flash-latest para garantir
+    compatibilidade total e cota ativa.
     """
     try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        api_key = st.secrets["GEMINI_API_KEY"]
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
 
         prompt = f"""Você é um assistente especializado em limpeza de dados para restaurantes.
 
@@ -298,8 +297,20 @@ Arquivo CSV bruto:
 {texto_bruto_csv}
 ---"""
 
-        response = model.generate_content(prompt)
-        texto_resposta = response.text.strip()
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
+
+        resp = requests.post(url, json=payload, timeout=30)
+
+        if resp.status_code != 200:
+            st.error(f"⚠️ Erro na API do Gemini (HTTP {resp.status_code}): {resp.text[:300]}")
+            return None
+
+        resultado = resp.json()
+        texto_resposta = resultado["candidates"][0]["content"]["parts"][0]["text"].strip()
 
         # Limpar possíveis marcadores de código que a IA pode adicionar
         if texto_resposta.startswith("```"):
