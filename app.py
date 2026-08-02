@@ -15,7 +15,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit_authenticator as stauth
 from pymongo import MongoClient
-import google.generativeai as genai
+from google import genai
 import json
 import io
 from typing import Optional
@@ -263,8 +263,7 @@ def corrigir_csv_com_ia(texto_bruto_csv: str) -> Optional[pd.DataFrame]:
     retorna um DataFrame padronizado com as 4 colunas obrigatórias.
     """
     try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
         prompt = f"""Você é um assistente especializado em limpeza de dados para restaurantes.
 
@@ -298,7 +297,10 @@ Arquivo CSV bruto:
 {texto_bruto_csv}
 ---"""
 
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
         texto_resposta = response.text.strip()
 
         # Limpar possíveis marcadores de código que a IA pode adicionar
