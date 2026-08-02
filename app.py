@@ -18,6 +18,7 @@ from pymongo import MongoClient
 import requests
 import json
 import io
+import time
 from datetime import datetime
 from bson import ObjectId
 from typing import Optional
@@ -388,11 +389,12 @@ with st.sidebar:
 # ──────────────────────────────────────────────
 # Função de Correção Automática via IA (Gemini)
 # ──────────────────────────────────────────────
+@st.cache_data(show_spinner=False, ttl=3600)
 def corrigir_csv_com_ia(texto_bruto_csv: str) -> Optional[pd.DataFrame]:
     """
     Envia o texto bruto do CSV para a API REST do Gemini.
-    Usa chamada HTTP direta com gemini-flash-latest para garantir
-    compatibilidade total e cota ativa.
+    Usa chamada HTTP direta com gemini-flash-latest e cache do Streamlit
+    para evitar re-chamadas desnecessárias e erros de cota (429).
     """
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
@@ -436,10 +438,22 @@ Arquivo CSV bruto:
             }]
         }
 
-        resp = requests.post(url, json=payload, timeout=30)
+        # Tentativas com tratamento de cota / rate limit (429)
+        max_tentativas = 3
+        resp = None
 
-        if resp.status_code != 200:
-            st.error(f"⚠️ Erro na API do Gemini (HTTP {resp.status_code}): {resp.text[:300]}")
+        for tentativa in range(max_tentativas):
+            resp = requests.post(url, json=payload, timeout=30)
+            if resp.status_code == 200:
+                break
+            elif resp.status_code == 429 and tentativa < max_tentativas - 1:
+                time.sleep(4)  # Aguarda 4 segundos se estourar a cota momentânea
+            else:
+                break
+
+        if resp is None or resp.status_code != 200:
+            err_msg = resp.text[:300] if resp else "Sem resposta"
+            st.error(f"⚠️ Erro na API do Gemini (HTTP {resp.status_code if resp else 'N/A'}): {err_msg}")
             return None
 
         resultado = resp.json()
