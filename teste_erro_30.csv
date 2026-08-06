@@ -1,0 +1,31 @@
+Prato / Item;Categoria;Custo do Prato (R$);Preço Venda (R$);Qtde Vendas Mês;Chef Responsável;Fornecedor;Status
+Picanha na Chapa;Carnes;R$ 45,90;R$ 89,90;120 un;Carlos;Friboi;Ativo
+Filé Mignon ao Poivre;Carnes;R$ 40;95;85;Amanda;Swift;Ativo
+Hambúrguer Artesanal Bacon;Lanches;15;R$ 38,00;340;Marcos;Casa das Carnes;Ativo
+Pizza Margherita 8 Fatias;Pizzas;R$ 18,20;R$ 55.00;210;Juliana;Moinho Paulista;Ativo
+Lasanha à Bolonhesa;Massas;22,4;R$ 48,90;145;Carlos;Barilla;Ativo
+Risoto de Camarão;Frutos do Mar;R$ 30,00;R$ 72,00;95;Amanda;Peixaria Central;Ativo
+Feijoada Completa (2 pessoas);Pratos Feitos;35;82;180;Marcos;Distribuidora Silva;Ativo
+Salmão Grelhado c/ Alcaparras;Peixes;R$ 42,10;R$ 88,00;65;Amanda;Peixaria Central;Ativo
+Frango a Passarinho;Petiscos;R$ 14,00;R$ 35,00;230;Carlos;Seara;Ativo
+Batata Frita Especial c/ Cheddar;Porções;8,5;28;410;Marcos;McCain;Ativo
+Iscas de Peixe Empanado;Petiscos;R$ 15,80;R$ 48,00;175;Amanda;Peixaria Central;Ativo
+Spaghetti Carbonara;Massas;R$ 16,50;R$ 44,00;130;Juliana;Barilla;Ativo
+Costela Suína ao Barbecue;Carnes;R$ 29,90;R$ 69,90;110;Carlos;Perdigão;Ativo
+Coxinha de Frango c/ Catupiry;Salgados;R$ 3,20;R$ 9,50;520;Juliana;Fabricação Própria;Ativo
+Pastel de Queijo da Roça;Salgados;R$ 2,80;R$ 8,00;480;Juliana;Fabricação Própria;Ativo
+Nhoque ao Molho Quatro Queijos;Massas;18;R$ 42,00;115;Juliana;Moinho Paulista;Ativo
+Escondidinho de Carne Seca;Pratos Feitos;R$ 17,50;R$ 39,90;160;Marcos;Distribuidora Silva;Ativo
+Strogonoff de Frango;Pratos Feitos;14,9;34,5;290;Carlos;Seara;Ativo
+Bife a Milanesa c/ Purê;Pratos Feitos;R$ 16,00;R$ 36,00;205;Marcos;Friboi;Ativo
+Caldo Verde na Broa;Sopas;11;36;90;Juliana;Horta Local;Ativo
+Ceviche Tradicional Peruano;Entradas;R$ 24,00;R$ 52,00;70;Amanda;Peixaria Central;Ativo
+Carpaccio de Mignon c/ Rúcula;Entradas;R$ 22,00;R$ 46,00;60;Amanda;Swift;Ativo
+Petit Gâteau c/ Sorvete de Baunilha;Sobremesas;R$ 6,50;R$ 24,00;260;Juliana;Nestlé;Ativo
+Pudim de Leite Condensado;Sobremesas;3,5;14;310;Juliana;Fabricação Própria;Ativo
+Brownie c/ Calda Quente;Sobremesas;R$ 5,80;R$ 22,00;195;Juliana;Fabricação Própria;Ativo
+Cheesecake de Frutas Vermelhas;Sobremesas;R$ 7,20;R$ 26,00;140;Juliana;Fabricação Própria;Ativo
+Suco Natural de Laranja 500ml;Bebidas;2,5;10;620;Outros;Horta Local;Ativo
+Refrigerante Lata 350ml;Bebidas;R$ 3,00;R$ 7,50;850;Outros;Ambev;Ativo
+Cerveja Artesanal IPA 500ml;Bebidas;R$ 8,00;R$ 22,00;330;Outros;Cervejaria Local;Ativo
+Caipirinha de Limão Tradicional;Drinks;R$ 4,50;R$ 20,00;410;Outros;Cachaçaria Silva;Ativo

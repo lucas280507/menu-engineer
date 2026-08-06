@@ -176,6 +176,11 @@ def listar_clientes_mongo(username: str) -> list[dict]:
             clientes.append({
                 "_id": str(doc["_id"]),
                 "nome": doc.get("nome", "Sem nome"),
+                "cnpj": doc.get("cnpj", ""),
+                "uf": doc.get("uf", ""),
+                "cidade": doc.get("cidade", ""),
+                "endereco": doc.get("endereco", ""),
+                "numero": doc.get("numero", ""),
                 "data_criacao": doc.get("data_criacao", datetime.now())
             })
         return clientes
@@ -183,15 +188,28 @@ def listar_clientes_mongo(username: str) -> list[dict]:
         st.error(f"Erro ao buscar clientes: {e}")
         return []
 
-def criar_cliente_mongo(username: str, nome: str) -> Optional[str]:
-    """Cria um novo cliente no MongoDB."""
+def criar_cliente_mongo(username: str, nome: str, cnpj: str, uf: str = "", cidade: str = "", endereco: str = "", numero: str = "") -> Optional[str]:
+    """Cria um novo cliente no MongoDB. Retorna o ID, 'CNPJ_DUPLICADO' se já existir, ou None em caso de erro."""
     try:
         client = get_mongo_client()
         db = client["cardapio_auth"]
         colecao = db["clientes"]
+
+        # Limpar CNPJ (manter apenas dígitos)
+        cnpj_limpo = ''.join(filter(str.isdigit, cnpj))
+
+        # Verificar duplicidade de CNPJ (global, independente do usuário)
+        if colecao.find_one({"cnpj": cnpj_limpo}):
+            return "CNPJ_DUPLICADO"
+
         res = colecao.insert_one({
             "username": username,
             "nome": nome.strip(),
+            "cnpj": cnpj_limpo,
+            "uf": uf,
+            "cidade": cidade.strip(),
+            "endereco": endereco.strip(),
+            "numero": numero.strip(),
             "data_criacao": datetime.now()
         })
         return str(res.inserted_id)
@@ -254,6 +272,35 @@ def excluir_analise_mongo(analise_id: str) -> bool:
     except Exception as e:
         st.error(f"Erro ao excluir análise: {e}")
         return False
+
+
+def excluir_cliente_mongo(cliente_id: str) -> bool:
+    """Exclui um cliente e todas as suas análises vinculadas (cascade delete)."""
+    try:
+        client = get_mongo_client()
+        db = client["cardapio_auth"]
+        # Cascade: excluir todas as análises vinculadas ao cliente
+        db["analises"].delete_many({"cliente_id": cliente_id})
+        # Excluir o próprio cliente
+        db["clientes"].delete_one({"_id": ObjectId(cliente_id)})
+        return True
+    except Exception as e:
+        st.error(f"Erro ao excluir cliente: {e}")
+        return False
+
+
+def formatar_cnpj(cnpj: str) -> str:
+    """Formata um CNPJ numérico para o padrão XX.XXX.XXX/XXXX-XX."""
+    cnpj_limpo = ''.join(filter(str.isdigit, cnpj))
+    if len(cnpj_limpo) == 14:
+        return f"{cnpj_limpo[:2]}.{cnpj_limpo[2:5]}.{cnpj_limpo[5:8]}/{cnpj_limpo[8:12]}-{cnpj_limpo[12:14]}"
+    return cnpj
+
+
+def validar_cnpj(cnpj: str) -> bool:
+    """Valida se o CNPJ possui exatamente 14 dígitos numéricos."""
+    cnpj_limpo = ''.join(filter(str.isdigit, cnpj))
+    return len(cnpj_limpo) == 14
 
 
 
@@ -329,11 +376,11 @@ with st.sidebar:
     authenticator.logout("🚪 Sair", key="logout_btn")
     st.markdown("---")
 
-    # 🏢 Gestão de Clientes
+    # 🏢 Seletor de Cliente
     st.header("🏢 Cliente / Restaurante")
     
     lista_clientes = listar_clientes_mongo(username_atual)
-    opcoes_clientes = {"none": "Nenhum (Análise Avulsa)", "new": "➕ Cadastrar Novo Cliente..."}
+    opcoes_clientes = {"none": "Nenhum (Análise Avulsa)"}
     for c in lista_clientes:
         opcoes_clientes[c["_id"]] = f"🏢 {c['nome']}"
         
@@ -346,24 +393,12 @@ with st.sidebar:
 
     cliente_selecionado_obj = None
 
-    if escolha_cliente == "new":
-        with st.form("form_novo_cliente"):
-            st.caption("Cadastrar novo cliente:")
-            nome_novo = st.text_input("Nome do Restaurante/Cliente", placeholder="Ex: Restaurante Paris")
-            btn_salvar_cli = st.form_submit_button("Salvar Cliente")
-            if btn_salvar_cli:
-                if nome_novo.strip():
-                    novo_id = criar_cliente_mongo(username_atual, nome_novo)
-                    if novo_id:
-                        st.success(f"Cliente '{nome_novo}' cadastrado!")
-                        st.rerun()
-                else:
-                    st.warning("Insira um nome válido.")
-    elif escolha_cliente != "none":
+    if escolha_cliente != "none":
         cliente_selecionado_obj = next((c for c in lista_clientes if c["_id"] == escolha_cliente), None)
         if cliente_selecionado_obj:
             st.success(f"Ativo: **{cliente_selecionado_obj['nome']}**")
 
+    st.caption("Para cadastrar ou gerenciar clientes, acesse a aba 🏢 Clientes.")
     st.markdown("---")
 
     st.header("📂 Importar Dados")
@@ -625,10 +660,11 @@ def criar_grafico_matriz(df: pd.DataFrame, media_margem: float, media_popularida
 # ──────────────────────────────────────────────
 # ESTRUTURA DE ABAS PRINCIPAIS
 # ──────────────────────────────────────────────
-tab_analise, tab_historico, tab_comparador = st.tabs([
+tab_analise, tab_historico, tab_comparador, tab_clientes = st.tabs([
     "📊 Análise Atual",
     "📁 Histórico do Cliente",
-    "⚔️ Comparador (Antes vs. Depois)"
+    "⚔️ Comparador (Antes vs. Depois)",
+    "🏢 Clientes / Restaurantes"
 ])
 
 # ==============================================================================
@@ -973,6 +1009,121 @@ with tab_comparador:
                         titulo=f"DEPOIS: {ana_b['rotulo']}"
                     )
                     st.plotly_chart(fig_b, width="stretch")
+
+
+# ==============================================================================
+# ABA 4: CLIENTES / RESTAURANTES
+# ==============================================================================
+with tab_clientes:
+    st.subheader("🏢 Cadastro de Clientes / Restaurantes")
+    st.caption("Gerencie seus clientes cadastrados e adicione novos restaurantes para acompanhar o desempenho do cardápio.")
+
+    # ── Formulário de Cadastro ──
+    with st.expander("➕ Cadastrar Novo Cliente", expanded=not bool(lista_clientes)):
+        with st.form("form_cadastro_cliente", clear_on_submit=True):
+            st.markdown("##### 📝 Dados do Estabelecimento")
+
+            col_nome, col_cnpj = st.columns([1, 1])
+            with col_nome:
+                nome_cli = st.text_input("Nome do Restaurante/Cliente *", placeholder="Ex: Restaurante Paris")
+            with col_cnpj:
+                cnpj_cli = st.text_input("CNPJ *", placeholder="XX.XXX.XXX/XXXX-XX", help="Informe os 14 dígitos do CNPJ (com ou sem pontuação).")
+
+            col_uf, col_cidade = st.columns([1, 2])
+            with col_uf:
+                UF_BRASIL = [
+                    "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA",
+                    "MG", "MS", "MT", "PA", "PB", "PE", "PI", "PR", "RJ", "RN",
+                    "RO", "RR", "RS", "SC", "SE", "SP", "TO"
+                ]
+                uf_cli = st.selectbox("UF", options=[""] + UF_BRASIL, index=0)
+            with col_cidade:
+                cidade_cli = st.text_input("Cidade", placeholder="Ex: São Paulo")
+
+            col_end, col_num = st.columns([3, 1])
+            with col_end:
+                endereco_cli = st.text_input("Endereço", placeholder="Ex: Rua Augusta")
+            with col_num:
+                numero_cli = st.text_input("Número", placeholder="Ex: 1234")
+
+            btn_cadastrar = st.form_submit_button("✅ Cadastrar Cliente", type="primary")
+
+            if btn_cadastrar:
+                if not nome_cli.strip():
+                    st.error("❌ O **nome** do cliente é obrigatório.")
+                elif not cnpj_cli.strip():
+                    st.error("❌ O **CNPJ** é obrigatório.")
+                elif not validar_cnpj(cnpj_cli):
+                    st.error("❌ CNPJ inválido. Informe exatamente 14 dígitos numéricos (com ou sem formatação).")
+                else:
+                    resultado = criar_cliente_mongo(
+                        username=username_atual,
+                        nome=nome_cli,
+                        cnpj=cnpj_cli,
+                        uf=uf_cli,
+                        cidade=cidade_cli,
+                        endereco=endereco_cli,
+                        numero=numero_cli
+                    )
+                    if resultado == "CNPJ_DUPLICADO":
+                        st.error(f"❌ Já existe um cliente cadastrado com o CNPJ **{formatar_cnpj(cnpj_cli)}**. Cada CNPJ pode ser cadastrado apenas uma vez.")
+                    elif resultado:
+                        st.success(f"✅ Cliente **{nome_cli}** cadastrado com sucesso!")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("❌ Erro inesperado ao cadastrar o cliente. Tente novamente.")
+
+    # ── Lista de Clientes Cadastrados ──
+    st.markdown("---")
+    st.subheader("📋 Meus Clientes Cadastrados")
+
+    lista_clientes_tab = listar_clientes_mongo(username_atual)
+
+    if not lista_clientes_tab:
+        st.info("Nenhum cliente cadastrado ainda. Use o formulário acima para adicionar seu primeiro restaurante! 🍽️")
+    else:
+        st.write(f"Total de clientes: **{len(lista_clientes_tab)}**")
+
+        for cli in lista_clientes_tab:
+            data_str = cli["data_criacao"].strftime("%d/%m/%Y") if isinstance(cli["data_criacao"], datetime) else "—"
+            cnpj_display = formatar_cnpj(cli.get("cnpj", "")) if cli.get("cnpj") else "Não informado"
+
+            with st.expander(f"🏢 **{cli['nome']}** — CNPJ: {cnpj_display}", expanded=False):
+                info_c1, info_c2, info_c3 = st.columns(3)
+                info_c1.markdown(f"**UF:** {cli.get('uf') or '—'}")
+                info_c2.markdown(f"**Cidade:** {cli.get('cidade') or '—'}")
+                info_c3.markdown(f"**Cadastrado em:** {data_str}")
+
+                endereco_completo = cli.get('endereco', '')
+                if cli.get('numero'):
+                    endereco_completo += f", nº {cli['numero']}"
+                if endereco_completo:
+                    st.markdown(f"**Endereço:** {endereco_completo}")
+
+                st.markdown("---")
+
+                # ── Controle de confirmação de exclusão ──
+                confirm_key = f"confirm_del_cli_{cli['_id']}"
+
+                if st.session_state.get(confirm_key, False):
+                    st.warning(f"⚠️ **Tem certeza que deseja excluir '{cli['nome']}'?** Todas as análises vinculadas a este cliente também serão excluídas permanentemente.")
+                    col_sim, col_nao = st.columns(2)
+                    with col_sim:
+                        if st.button("⚠️ Sim, excluir permanentemente", key=f"yes_del_{cli['_id']}", type="primary"):
+                            if excluir_cliente_mongo(cli["_id"]):
+                                st.success(f"Cliente '{cli['nome']}' e todas as suas análises foram excluídos.")
+                                st.session_state[confirm_key] = False
+                                time.sleep(1)
+                                st.rerun()
+                    with col_nao:
+                        if st.button("❌ Cancelar", key=f"no_del_{cli['_id']}"):
+                            st.session_state[confirm_key] = False
+                            st.rerun()
+                else:
+                    if st.button(f"🗑️ Excluir Cliente", key=f"del_cli_{cli['_id']}"):
+                        st.session_state[confirm_key] = True
+                        st.rerun()
 
 
 # ──────────────────────────────────────────────
