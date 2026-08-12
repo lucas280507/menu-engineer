@@ -963,9 +963,16 @@ with tab_comparador:
                     def avaliar_evolucao(row):
                         c_antes = row["Classificação (Antes)"]
                         c_depois = row["Classificação (Depois)"]
+                        margem_antes = row["Margem de Contribuição (R$) (Antes)"]
+                        margem_depois = row["Margem de Contribuição (R$) (Depois)"]
                         
                         if c_antes == c_depois:
-                            return "Mantido ➡️"
+                            if margem_depois < margem_antes:
+                                return "Atenção ⚠️ (Margem caiu)"
+                            elif margem_depois > margem_antes:
+                                return "Melhorou 🟢 (Margem subiu)"
+                            else:
+                                return "Mantido ➡️"
                         elif c_depois == "Estrela 🌟":
                             return "Excelente Ev. 🎯 (Virou Estrela)"
                         elif c_antes == "Cão 🐶" and c_depois != "Cão 🐶":
