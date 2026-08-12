@@ -933,17 +933,17 @@ with tab_comparador:
                 mc1.metric(
                     "Lucro Total (Margem Bruta)",
                     f"R$ {lucro_b:,.2f}",
-                    delta=f"R$ {diff_lucro:+,.2f} ({pct_lucro:+.1f}%)"
+                    delta=f"{diff_lucro:+,.2f} R$ ({pct_lucro:+.1f}%)"
                 )
                 mc2.metric(
                     "Faturamento / Receita",
                     f"R$ {rec_b:,.2f}",
-                    delta=f"R$ {diff_rec:+,.2f} ({pct_rec:+.1f}%)"
+                    delta=f"{diff_rec:+,.2f} R$ ({pct_rec:+.1f}%)"
                 )
                 mc3.metric(
                     "Margem Média por Prato",
                     f"R$ {marg_b:,.2f}",
-                    delta=f"R$ {diff_marg:+,.2f}"
+                    delta=f"{diff_marg:+,.2f} R$"
                 )
 
                 st.markdown("---")
