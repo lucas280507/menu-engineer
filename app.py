@@ -691,6 +691,27 @@ with tab_analise:
             if colunas_faltantes:
                 csv_precisa_correcao = True
 
+        # ── Fallback: tentar separador ; (padrão Excel brasileiro) ──
+        if csv_precisa_correcao:
+            try:
+                df_tentativa = pd.read_csv(io.StringIO(texto_bruto), sep=";")
+                colunas_faltantes_br = [c for c in COLUNAS_OBRIGATORIAS if c not in df_tentativa.columns]
+                if not colunas_faltantes_br:
+                    # Converter decimais brasileiros (vírgula → ponto)
+                    for col in ["Custo Unitário", "Preço de Venda"]:
+                        if df_tentativa[col].dtype == object:
+                            df_tentativa[col] = df_tentativa[col].astype(str).str.replace(",", ".", regex=False)
+                        df_tentativa[col] = pd.to_numeric(df_tentativa[col], errors="coerce").fillna(0)
+                    df_tentativa["Quantidade Vendida"] = pd.to_numeric(
+                        df_tentativa["Quantidade Vendida"].astype(str).str.replace(",", ".", regex=False),
+                        errors="coerce"
+                    ).fillna(0).astype(int)
+                    df_bruto = df_tentativa
+                    csv_precisa_correcao = False
+                    st.info("📋 CSV com formatação brasileira (separador `;`) detectado e convertido automaticamente.")
+            except Exception:
+                pass  # Se falhar, segue para a IA normalmente
+
         if df_bruto is not None and not csv_precisa_correcao:
             try:
                 df_bruto["Custo Unitário"] = pd.to_numeric(df_bruto["Custo Unitário"], errors="raise")
